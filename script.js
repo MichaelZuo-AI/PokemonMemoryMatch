@@ -231,7 +231,7 @@ function updateConfetti() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (confettiParticles.length === 0) return;
 
-    confettiParticles.forEach((p, index) => {
+    confettiParticles.forEach((p) => {
         p.y += p.speedY;
         p.x += p.speedX;
         p.rotation += p.rotationSpeed;
@@ -242,11 +242,9 @@ function updateConfetti() {
         ctx.fillStyle = p.color;
         ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
         ctx.restore();
-
-        if (p.y > canvas.height) {
-            confettiParticles.splice(index, 1);
-        }
     });
+
+    confettiParticles = confettiParticles.filter(p => p.y <= canvas.height);
 
     if (confettiParticles.length > 0) {
         requestAnimationFrame(updateConfetti);
@@ -278,6 +276,10 @@ document.getElementById('battle-vs-cpu-btn').addEventListener('click', () => {
 });
 
 document.getElementById('battle-vs-online-btn').addEventListener('click', () => {
+    if (typeof Peer === 'undefined') {
+        alert('Online mode is not available right now. Please check your internet connection.');
+        return;
+    }
     showBattleLobby();
 });
 
@@ -402,8 +404,7 @@ function initGame() {
     const BOARD_SIZE = 20;
     let gamePokemon = shuffleArray(POKEMON_DATA).slice(0, BOARD_SIZE);
     totalPairsInGame = gamePokemon.length;
-    let deck = [...gamePokemon, ...gamePokemon];
-    deck.sort(() => Math.random() - 0.5);
+    let deck = shuffleArray([...gamePokemon, ...gamePokemon]);
 
     deck.forEach((pokemon, index) => {
         const card = createCard(pokemon);
@@ -434,6 +435,7 @@ function createCard(pokemon) {
     img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.id}.png`;
     img.alt = pokemon.name;
     img.classList.add('card-content');
+    img.onerror = () => handleSpriteError(img, pokemon.name);
     front.appendChild(img);
 
     const back = document.createElement('div');
@@ -542,7 +544,6 @@ playAgainBtn.addEventListener('click', initGame);
 let peer = null;
 let conn = null;
 let isHost = false;
-let isOnline = false;
 
 // Lobby DOM elements
 const lobbyOnlineChoice = document.getElementById('lobby-online-choice');
@@ -553,7 +554,7 @@ const lobbyCodeInput = document.getElementById('lobby-code-input');
 const lobbyJoinStatus = document.getElementById('lobby-join-status');
 
 function showBattleLobby() {
-    isOnline = false;
+    hpBattleState.isOnline = false;
     isHost = false;
     cleanupPeer();
     showScreen('battle-lobby');
@@ -605,7 +606,8 @@ document.getElementById('lobby-connect-btn').addEventListener('click', () => {
     joinRoom(code);
 });
 
-function createRoom() {
+function createRoom(retries = 0) {
+    const MAX_RETRIES = 5;
     const code = String(Math.floor(1000 + Math.random() * 9000));
     lobbyRoomCode.textContent = code;
     isHost = true;
@@ -622,15 +624,22 @@ function createRoom() {
     });
 
     peer.on('error', (err) => {
-        if (err.type === 'unavailable-id') {
+        if (err.type === 'unavailable-id' && retries < MAX_RETRIES) {
             // Room code collision — regenerate
             peer.destroy();
-            createRoom();
+            createRoom(retries + 1);
         } else {
             console.error('PeerJS error:', err);
+            if (retries >= MAX_RETRIES) {
+                lobbyRoomCode.textContent = '----';
+                lobbyCreateView.classList.add('hidden');
+                lobbyOnlineChoice.classList.remove('hidden');
+            }
         }
     });
 }
+
+let joinTimeout = null;
 
 function joinRoom(code) {
     lobbyJoinStatus.textContent = 'Connecting...';
@@ -638,19 +647,27 @@ function joinRoom(code) {
 
     peer = new Peer();
 
+    joinTimeout = setTimeout(() => {
+        lobbyJoinStatus.textContent = 'Connection timed out. Try again.';
+        cleanupPeer();
+    }, 15000);
+
     peer.on('open', () => {
         conn = peer.connect('pokemon-' + code, { reliable: true });
 
         conn.on('open', () => {
+            clearTimeout(joinTimeout);
             setupConnection();
         });
 
         conn.on('error', () => {
+            clearTimeout(joinTimeout);
             lobbyJoinStatus.textContent = 'Connection failed! Check the code.';
         });
     });
 
     peer.on('error', (err) => {
+        clearTimeout(joinTimeout);
         console.error('PeerJS error:', err);
         lobbyJoinStatus.textContent = 'Could not connect. Try again.';
     });
@@ -659,14 +676,38 @@ function joinRoom(code) {
 function setupConnection() {
     conn.on('data', onDataReceived);
     conn.on('close', handleDisconnect);
-    isOnline = true;
     hpBattleState.isOnline = true;
     hpBattleState.isHost = isHost;
     // Both players go to team picker
     showTeamPicker();
 }
 
+function validateMessage(data) {
+    if (!data || typeof data !== 'object' || typeof data.type !== 'string') return false;
+    switch (data.type) {
+        case 'hp-team-ready':
+            return Array.isArray(data.team) && data.team.length === 3 &&
+                data.team.every(id => typeof id === 'number');
+        case 'hp-start-battle':
+            return Array.isArray(data.hostTeam) && data.hostTeam.every(id => typeof id === 'number');
+        case 'hp-turn-result':
+            return typeof data.resultType === 'string';
+        case 'hp-switch-choice':
+            return typeof data.newActiveIndex === 'number' &&
+                data.newActiveIndex >= 0 && data.newActiveIndex < 3;
+        case 'hp-request-switch':
+        case 'hp-play-again':
+            return true;
+        default:
+            return false;
+    }
+}
+
 function onDataReceived(data) {
+    if (!validateMessage(data)) {
+        console.warn('Invalid network message received:', data);
+        return;
+    }
     switch (data.type) {
         case 'hp-team-ready':
             handleOpponentTeamReady(data);
@@ -690,8 +731,7 @@ function onDataReceived(data) {
 }
 
 function handleDisconnect() {
-    if (isOnline) {
-        isOnline = false;
+    if (hpBattleState.isOnline) {
         hpBattleState.isOnline = false;
         cleanupPeer();
         // Show disconnect overlay
@@ -892,6 +932,15 @@ function getSpriteUrl(pokemonId) {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonId}.png`;
 }
 
+function handleSpriteError(img, pokemonName) {
+    img.onerror = null;
+    img.style.display = 'none';
+    const fallback = document.createElement('div');
+    fallback.textContent = pokemonName || '?';
+    fallback.style.cssText = 'font-size: 2.5vh; font-weight: bold; color: #666; text-align: center; padding: 1vh;';
+    img.parentNode.insertBefore(fallback, img.nextSibling);
+}
+
 function shuffleArray(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -990,7 +1039,6 @@ document.getElementById('team-picker-back-btn').addEventListener('click', () => 
     if (hpBattleState.isOnline) {
         cleanupPeer();
         hpBattleState.isOnline = false;
-        isOnline = false;
     }
     showScreen('battle-mode-selector');
 });
@@ -1251,8 +1299,10 @@ function renderBattleScene() {
     const cpuTypeBadge = document.getElementById('cpu-pokemon-type');
     cpuTypeBadge.textContent = cpu.type;
     cpuTypeBadge.className = `type-badge type-${cpu.type}`;
-    document.getElementById('cpu-pokemon-sprite').src = getSpriteUrl(cpu.id);
-    document.getElementById('cpu-pokemon-sprite').alt = cpu.name;
+    const cpuSprite = document.getElementById('cpu-pokemon-sprite');
+    cpuSprite.src = getSpriteUrl(cpu.id);
+    cpuSprite.alt = cpu.name;
+    cpuSprite.onerror = () => handleSpriteError(cpuSprite, cpu.name);
     renderHpBar('cpu-hp-bar', 'cpu-hp-text', cpu.currentHp, cpu.hp);
 
     // Player display
@@ -1260,8 +1310,10 @@ function renderBattleScene() {
     const playerTypeBadge = document.getElementById('player-pokemon-type');
     playerTypeBadge.textContent = player.type;
     playerTypeBadge.className = `type-badge type-${player.type}`;
-    document.getElementById('player-pokemon-sprite').src = getSpriteUrl(player.id);
-    document.getElementById('player-pokemon-sprite').alt = player.name;
+    const playerSprite = document.getElementById('player-pokemon-sprite');
+    playerSprite.src = getSpriteUrl(player.id);
+    playerSprite.alt = player.name;
+    playerSprite.onerror = () => handleSpriteError(playerSprite, player.name);
     renderHpBar('player-hp-bar', 'player-hp-text', player.currentHp, player.hp);
 
     // Team dots
@@ -1457,7 +1509,6 @@ document.getElementById('hp-battle-menu-btn-modal').addEventListener('click', ()
     if (hpBattleState.isOnline) {
         cleanupPeer();
         hpBattleState.isOnline = false;
-        isOnline = false;
     }
     showScreen('mode-selector');
 });
@@ -1466,7 +1517,6 @@ document.getElementById('hp-battle-menu-btn').addEventListener('click', () => {
     if (hpBattleState.isOnline) {
         cleanupPeer();
         hpBattleState.isOnline = false;
-        isOnline = false;
     }
     showScreen('mode-selector');
 });
