@@ -151,16 +151,6 @@ h1 {
 .card-front {
     background-color: var(--card-bg);
     transform: rotateY(180deg);
-    flex-direction: column;
-    padding: 5%;
-    gap: 0.5vh;
-}
-
-.card-name {
-    font-size: 1.8vh;
-    color: var(--secondary-color);
-    font-weight: bold;
-    text-align: center;
 }
 
 .card-back {
@@ -187,7 +177,7 @@ h1 {
 
 .card-content {
     width: 80%;
-    height: 70%;
+    height: 80%;
     object-fit: contain;
 }
 

@@ -170,10 +170,6 @@ function createCard(pokemon) {
     img.alt = pokemon.name;
     img.classList.add('card-content');
     front.appendChild(img);
-    const nameLabel = document.createElement('span');
-    nameLabel.classList.add('card-name');
-    nameLabel.textContent = pokemon.name;
-    front.appendChild(nameLabel);
 
     const back = document.createElement('div');
     back.classList.add('card-face', 'card-back');
