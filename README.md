@@ -3,7 +3,7 @@
 A web-based memory matching game built specifically for **Damian (5 years old)**. 
 Designed for **Xiaomi Pad 7S Pro** (3:2 Aspect Ratio).
 
-👉 **[Play the Game Here](https://zuozzpman1.github.io/PokemonMemoryMatch/)** 👈
+👉 **[Play the Game Here](https://MichaelZuo-AI.github.io/PokemonMemoryMatch/)** 👈
 
 ## Features for Damian
 *   **Simple English**: Easy-to-read words like "Score", "Restart", and "Good Job".

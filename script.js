@@ -25,6 +25,36 @@ const POKEMON_DATA = [
     { id: 136, name: 'Flareon', color: '#f08030', type: 'fire', power: 65 },
 ];
 
+// ===========================
+// BATTLE POKEMON DATA (HP Battle Mode)
+// ===========================
+
+const BATTLE_POKEMON = [
+    // Fire (4)
+    { id: 4, name: 'Charmander', type: 'fire', hp: 20, attackName: 'Ember', baseDamage: 6 },
+    { id: 6, name: 'Charizard', type: 'fire', hp: 28, attackName: 'Flamethrower', baseDamage: 6 },
+    { id: 37, name: 'Vulpix', type: 'fire', hp: 18, attackName: 'Fire Spin', baseDamage: 7 },
+    { id: 136, name: 'Flareon', type: 'fire', hp: 25, attackName: 'Fire Blast', baseDamage: 5 },
+    // Water (4)
+    { id: 7, name: 'Squirtle', type: 'water', hp: 22, attackName: 'Water Gun', baseDamage: 6 },
+    { id: 9, name: 'Blastoise', type: 'water', hp: 28, attackName: 'Hydro Cannon', baseDamage: 6 },
+    { id: 54, name: 'Psyduck', type: 'water', hp: 20, attackName: 'Aqua Tail', baseDamage: 7 },
+    { id: 131, name: 'Lapras', type: 'water', hp: 28, attackName: 'Surf', baseDamage: 5 },
+    // Grass (3)
+    { id: 1, name: 'Bulbasaur', type: 'grass', hp: 22, attackName: 'Vine Whip', baseDamage: 6 },
+    { id: 3, name: 'Venusaur', type: 'grass', hp: 26, attackName: 'Solar Beam', baseDamage: 6 },
+    { id: 470, name: 'Leafeon', type: 'grass', hp: 25, attackName: 'Leaf Blade', baseDamage: 6 },
+    // Normal (5) — fan favorites
+    { id: 25, name: 'Pikachu', type: 'normal', hp: 20, attackName: 'Thunder', baseDamage: 6 },
+    { id: 149, name: 'Dragonite', type: 'normal', hp: 35, attackName: 'Dragon Claw', baseDamage: 10 },
+    { id: 150, name: 'Mewtwo', type: 'normal', hp: 32, attackName: 'Psychic', baseDamage: 11 },
+    { id: 94, name: 'Gengar', type: 'normal', hp: 18, attackName: 'Shadow Ball', baseDamage: 7 },
+    { id: 143, name: 'Snorlax', type: 'normal', hp: 30, attackName: 'Body Slam', baseDamage: 5 },
+];
+
+// All 16 unlocked from the start
+const UNLOCK_ORDER = BATTLE_POKEMON.map(p => p.id);
+
 // Type system constants
 const TYPE_BONUS = 25;
 const TYPE_CHART = {
@@ -39,6 +69,14 @@ const TYPE_COLORS = {
     grass: '#78c850',
     normal: '#a8a878',
 };
+
+function getTypeMultiplier(attackerType, defenderType) {
+    const chart = TYPE_CHART[attackerType];
+    if (!chart) return 1;
+    if (chart.beats === defenderType) return 2;
+    if (chart.losesTo === defenderType) return 0.5;
+    return 1;
+}
 
 // Audio Controller (Synthesized Sound)
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -109,6 +147,49 @@ function playTieSting() {
     playTone(350, 'triangle', 0.2);
     setTimeout(() => playTone(350, 'triangle', 0.3), 200);
     vibrate([30, 50, 30]);
+}
+
+// HP Battle Sounds
+function playAttackSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    switch (type) {
+        case 'fire':
+            playTone(200, 'sawtooth', 0.15);
+            setTimeout(() => playTone(400, 'sawtooth', 0.2), 80);
+            setTimeout(() => playTone(600, 'sawtooth', 0.1), 160);
+            break;
+        case 'water':
+            playTone(300, 'sine', 0.2);
+            setTimeout(() => playTone(500, 'sine', 0.15), 100);
+            setTimeout(() => playTone(250, 'sine', 0.2), 200);
+            break;
+        case 'grass':
+            playTone(350, 'triangle', 0.1);
+            setTimeout(() => playTone(450, 'triangle', 0.1), 60);
+            setTimeout(() => playTone(550, 'triangle', 0.15), 120);
+            break;
+        default:
+            playTone(250, 'square', 0.15);
+            setTimeout(() => playTone(350, 'square', 0.15), 100);
+            break;
+    }
+    vibrate([30, 20, 40]);
+}
+
+function playSuperEffectiveSound() {
+    playTone(400, 'square', 0.1);
+    setTimeout(() => playTone(600, 'square', 0.1), 80);
+    setTimeout(() => playTone(800, 'square', 0.2), 160);
+    setTimeout(() => playTone(1000, 'square', 0.3), 250);
+    vibrate([40, 20, 40, 20, 80]);
+}
+
+function playFaintSound() {
+    playTone(400, 'triangle', 0.2);
+    setTimeout(() => playTone(300, 'triangle', 0.2), 150);
+    setTimeout(() => playTone(200, 'triangle', 0.3), 300);
+    setTimeout(() => playTone(100, 'triangle', 0.4), 450);
+    vibrate([60, 40, 80]);
 }
 
 // Custom Audio for Damian
@@ -188,9 +269,106 @@ document.getElementById('mode-memory-btn').addEventListener('click', () => {
 });
 
 document.getElementById('mode-battle-btn').addEventListener('click', () => {
-    showScreen('battle-screen');
-    initBattle();
+    showScreen('battle-mode-selector');
 });
+
+document.getElementById('battle-vs-cpu-btn').addEventListener('click', () => {
+    hpBattleState.isOnline = false;
+    showTeamPicker();
+});
+
+document.getElementById('battle-vs-online-btn').addEventListener('click', () => {
+    showBattleLobby();
+});
+
+document.getElementById('battle-mode-back-btn').addEventListener('click', () => {
+    showScreen('mode-selector');
+});
+
+document.getElementById('mode-collection-btn').addEventListener('click', () => {
+    showCollectionScreen();
+});
+
+// ===========================
+// PROGRESSION / LOCALSTORAGE
+// ===========================
+
+const DEFAULT_PROGRESS = {
+    unlockedPokemon: [...UNLOCK_ORDER],
+    stickers: [],
+    winStreak: 0,
+    totalBattleWins: 0,
+    memoryWins: 0,
+};
+
+function loadProgress() {
+    try {
+        const saved = localStorage.getItem('pokemon-progress');
+        if (saved) {
+            const data = JSON.parse(saved);
+            // Merge with defaults to handle new fields
+            const merged = { ...DEFAULT_PROGRESS, ...data };
+            // Ensure all current Pokemon are unlocked (roster may have changed)
+            UNLOCK_ORDER.forEach(id => {
+                if (!merged.unlockedPokemon.includes(id)) {
+                    merged.unlockedPokemon.push(id);
+                }
+            });
+            return merged;
+        }
+    } catch (e) {
+        console.log('Could not load progress:', e);
+    }
+    return { ...DEFAULT_PROGRESS };
+}
+
+function saveProgress(progress) {
+    try {
+        localStorage.setItem('pokemon-progress', JSON.stringify(progress));
+    } catch (e) {
+        console.log('Could not save progress:', e);
+    }
+}
+
+function unlockNextPokemon() {
+    const progress = loadProgress();
+    const nextToUnlock = UNLOCK_ORDER.find(id => !progress.unlockedPokemon.includes(id));
+    if (nextToUnlock) {
+        progress.unlockedPokemon.push(nextToUnlock);
+        saveProgress(progress);
+        return nextToUnlock;
+    }
+    return null;
+}
+
+function addSticker(pokemonId) {
+    const progress = loadProgress();
+    if (!progress.stickers.includes(pokemonId)) {
+        progress.stickers.push(pokemonId);
+        saveProgress(progress);
+    }
+}
+
+function incrementWinStreak() {
+    const progress = loadProgress();
+    progress.winStreak++;
+    progress.totalBattleWins++;
+    saveProgress(progress);
+    return progress.winStreak;
+}
+
+function resetWinStreak() {
+    const progress = loadProgress();
+    progress.winStreak = 0;
+    saveProgress(progress);
+}
+
+function recordMemoryWin() {
+    const progress = loadProgress();
+    progress.memoryWins++;
+    saveProgress(progress);
+    return unlockNextPokemon();
+}
 
 // ===========================
 // MEMORY MATCH GAME (existing)
@@ -326,46 +504,389 @@ function showVictory() {
     speakVictoryMessage();
     createConfetti();
     victoryModal.classList.remove('hidden');
+
+    // Unlock a new battle Pokemon
+    const newPokemon = recordMemoryWin();
+    if (newPokemon) {
+        const bp = BATTLE_POKEMON.find(p => p.id === newPokemon);
+        if (bp) {
+            setTimeout(() => {
+                showUnlockNotification(bp);
+            }, 2000);
+        }
+    }
+}
+
+function showUnlockNotification(pokemon) {
+    // Brief notification that a new Pokemon was unlocked
+    const notif = document.createElement('div');
+    notif.className = 'unlock-notification';
+    notif.innerHTML = `
+        <img src="${getSpriteUrl(pokemon.id)}" class="unlock-notif-sprite" alt="${pokemon.name}">
+        <div class="unlock-notif-text">New Pokemon!<br><strong>${pokemon.name}</strong></div>
+    `;
+    document.body.appendChild(notif);
+    setTimeout(() => {
+        notif.classList.add('unlock-notif-fade');
+        setTimeout(() => notif.remove(), 500);
+    }, 3000);
 }
 
 restartBtn.addEventListener('click', initGame);
 playAgainBtn.addEventListener('click', initGame);
 
 // ===========================
-// BATTLE MODE
+// BATTLE LOBBY & NETWORKING
 // ===========================
 
-const battleState = {
-    player1Hand: [],
-    player2Hand: [],
-    player1Score: 0,
-    player2Score: 0,
-    round: 1,
-    currentPlayer: 1,
-    player1Card: null,
-    player2Card: null,
-    phase: 'idle', // idle, p1-picking, passing, p2-picking, revealing, result
-};
+let peer = null;
+let conn = null;
+let isHost = false;
+let isOnline = false;
 
-// Battle DOM elements
-const battleRoundEl = document.getElementById('battle-round');
-const p1ScoreEl = document.getElementById('p1-score');
-const p2ScoreEl = document.getElementById('p2-score');
-const battlePromptEl = document.getElementById('battle-prompt');
-const arenaCard1El = document.getElementById('arena-card-1');
-const arenaCard2El = document.getElementById('arena-card-2');
-const arenaSlot1El = document.getElementById('arena-slot-1');
-const arenaSlot2El = document.getElementById('arena-slot-2');
-const playerHandEl = document.getElementById('player-hand');
-const battleResultArea = document.getElementById('battle-result-area');
-const roundResultText = document.getElementById('round-result-text');
-const nextRoundBtn = document.getElementById('next-round-btn');
-const passScreen = document.getElementById('pass-screen');
-const passText = document.getElementById('pass-text');
-const passReadyBtn = document.getElementById('pass-ready-btn');
-const battleResultModal = document.getElementById('battle-result-modal');
-const battleWinnerText = document.getElementById('battle-winner-text');
-const battleFinalScore = document.getElementById('battle-final-score');
+// Lobby DOM elements
+const lobbyOnlineChoice = document.getElementById('lobby-online-choice');
+const lobbyCreateView = document.getElementById('lobby-create-view');
+const lobbyJoinView = document.getElementById('lobby-join-view');
+const lobbyRoomCode = document.getElementById('lobby-room-code');
+const lobbyCodeInput = document.getElementById('lobby-code-input');
+const lobbyJoinStatus = document.getElementById('lobby-join-status');
+
+function showBattleLobby() {
+    isOnline = false;
+    isHost = false;
+    cleanupPeer();
+    showScreen('battle-lobby');
+    // Reset to initial choice view
+    lobbyOnlineChoice.classList.remove('hidden');
+    lobbyCreateView.classList.add('hidden');
+    lobbyJoinView.classList.add('hidden');
+}
+
+document.getElementById('lobby-online-back-btn').addEventListener('click', () => {
+    cleanupPeer();
+    showScreen('battle-mode-selector');
+});
+
+// Create Room
+document.getElementById('lobby-create-btn').addEventListener('click', () => {
+    lobbyOnlineChoice.classList.add('hidden');
+    lobbyCreateView.classList.remove('hidden');
+    createRoom();
+});
+
+document.getElementById('lobby-create-back-btn').addEventListener('click', () => {
+    cleanupPeer();
+    lobbyCreateView.classList.add('hidden');
+    lobbyOnlineChoice.classList.remove('hidden');
+});
+
+// Join Room
+document.getElementById('lobby-join-btn').addEventListener('click', () => {
+    lobbyOnlineChoice.classList.add('hidden');
+    lobbyJoinView.classList.remove('hidden');
+    lobbyCodeInput.value = '';
+    lobbyJoinStatus.textContent = '';
+    lobbyCodeInput.focus();
+});
+
+document.getElementById('lobby-join-back-btn').addEventListener('click', () => {
+    cleanupPeer();
+    lobbyJoinView.classList.add('hidden');
+    lobbyOnlineChoice.classList.remove('hidden');
+});
+
+document.getElementById('lobby-connect-btn').addEventListener('click', () => {
+    const code = lobbyCodeInput.value.trim();
+    if (code.length !== 4 || !/^\d{4}$/.test(code)) {
+        lobbyJoinStatus.textContent = 'Enter a 4-digit code!';
+        return;
+    }
+    joinRoom(code);
+});
+
+function createRoom() {
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    lobbyRoomCode.textContent = code;
+    isHost = true;
+
+    peer = new Peer('pokemon-' + code);
+
+    peer.on('open', () => {
+        // Peer is ready, code is displayed
+    });
+
+    peer.on('connection', (connection) => {
+        conn = connection;
+        setupConnection();
+    });
+
+    peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+            // Room code collision — regenerate
+            peer.destroy();
+            createRoom();
+        } else {
+            console.error('PeerJS error:', err);
+        }
+    });
+}
+
+function joinRoom(code) {
+    lobbyJoinStatus.textContent = 'Connecting...';
+    isHost = false;
+
+    peer = new Peer();
+
+    peer.on('open', () => {
+        conn = peer.connect('pokemon-' + code, { reliable: true });
+
+        conn.on('open', () => {
+            setupConnection();
+        });
+
+        conn.on('error', () => {
+            lobbyJoinStatus.textContent = 'Connection failed! Check the code.';
+        });
+    });
+
+    peer.on('error', (err) => {
+        console.error('PeerJS error:', err);
+        lobbyJoinStatus.textContent = 'Could not connect. Try again.';
+    });
+}
+
+function setupConnection() {
+    conn.on('data', onDataReceived);
+    conn.on('close', handleDisconnect);
+    isOnline = true;
+    hpBattleState.isOnline = true;
+    hpBattleState.isHost = isHost;
+    // Both players go to team picker
+    showTeamPicker();
+}
+
+function onDataReceived(data) {
+    switch (data.type) {
+        case 'hp-team-ready':
+            handleOpponentTeamReady(data);
+            break;
+        case 'hp-start-battle':
+            handleStartBattle(data);
+            break;
+        case 'hp-turn-result':
+            handleTurnResult(data);
+            break;
+        case 'hp-request-switch':
+            handleRequestSwitch();
+            break;
+        case 'hp-switch-choice':
+            handleSwitchChoice(data);
+            break;
+        case 'hp-play-again':
+            handleHpPlayAgain();
+            break;
+    }
+}
+
+function handleDisconnect() {
+    if (isOnline) {
+        isOnline = false;
+        hpBattleState.isOnline = false;
+        cleanupPeer();
+        // Show disconnect overlay
+        const overlay = document.getElementById('online-waiting-overlay');
+        document.getElementById('online-waiting-text').textContent = 'Opponent disconnected!';
+        overlay.classList.remove('hidden');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            showScreen('mode-selector');
+        }, 2000);
+    }
+}
+
+function cleanupPeer() {
+    if (conn) {
+        conn.close();
+        conn = null;
+    }
+    if (peer) {
+        peer.destroy();
+        peer = null;
+    }
+}
+
+function sendData(data) {
+    if (conn && conn.open) {
+        conn.send(data);
+    }
+}
+
+// ===========================
+// ONLINE HP BATTLE PROTOCOL
+// ===========================
+
+function handleOpponentTeamReady(data) {
+    hpBattleState.opponentTeamIds = data.team;
+    // Check if local player already submitted their team
+    if (selectedTeam.length === 3 && document.getElementById('online-waiting-overlay').classList.contains('hidden') === false) {
+        startOnlineBattle();
+    }
+}
+
+function startOnlineBattle() {
+    const overlay = document.getElementById('online-waiting-overlay');
+    overlay.classList.add('hidden');
+
+    const myTeam = selectedTeam.map(p => ({ ...p, currentHp: p.hp }));
+    const opponentTeam = hpBattleState.opponentTeamIds.map(id => {
+        const bp = BATTLE_POKEMON.find(p => p.id === id);
+        return { ...bp, currentHp: bp.hp };
+    });
+
+    hpBattleState.opponentTeamIds = null;
+
+    if (hpBattleState.isHost) {
+        sendData({
+            type: 'hp-start-battle',
+            hostTeam: myTeam.map(p => p.id),
+            guestTeam: opponentTeam.map(p => p.id),
+        });
+        // initHpBattle will start the auto-battle loop for host
+        initHpBattle(myTeam, opponentTeam);
+    } else {
+        // Guest: wait for start signal (host will send hp-start-battle)
+        hpBattleState._guestTeam = myTeam;
+        hpBattleState._guestOpponentTeam = opponentTeam;
+    }
+}
+
+function handleStartBattle(data) {
+    // Guest receives start signal — init battle but don't run auto-battle
+    // Guest will receive hp-turn-result messages from host and animate them
+    const myTeam = hpBattleState._guestTeam || selectedTeam.map(p => ({ ...p, currentHp: p.hp }));
+    const opponentTeam = data.hostTeam.map(id => {
+        const bp = BATTLE_POKEMON.find(p => p.id === id);
+        return { ...bp, currentHp: bp.hp };
+    });
+
+    const overlay = document.getElementById('online-waiting-overlay');
+    overlay.classList.add('hidden');
+
+    // initHpBattle won't start auto-battle for guest (isHost is false)
+    initHpBattle(myTeam, opponentTeam);
+}
+
+// Guest queues incoming turn results and plays them sequentially
+let guestAnimationQueue = [];
+let guestAnimating = false;
+
+function handleTurnResult(data) {
+    // Guest receives auto-battle results from host
+    guestAnimationQueue.push(data);
+    if (!guestAnimating) {
+        processNextGuestAnimation();
+    }
+}
+
+function processNextGuestAnimation() {
+    if (guestAnimationQueue.length === 0) {
+        guestAnimating = false;
+        return;
+    }
+    guestAnimating = true;
+    const data = guestAnimationQueue.shift();
+
+    if (data.resultType === 'attack') {
+        // Map sides — guest's perspective is flipped from host's
+        const localTargetSlot = data.targetSlot === 'cpu' ? 'player' : 'cpu';
+
+        let defender;
+        if (localTargetSlot === 'cpu') {
+            defender = hpBattleState.cpuTeam[hpBattleState.cpuActive];
+        } else {
+            defender = hpBattleState.playerTeam[hpBattleState.playerActive];
+        }
+
+        hpBattleState.phase = 'auto-battling';
+        renderBattleScene();
+
+        animateAttack(localTargetSlot, data.damage, data.multiplier, data.attackerType, () => {
+            defender.currentHp = Math.max(0, data.newHp);
+            renderBattleScene();
+
+            if (data.fainted) {
+                animateFaint(localTargetSlot, () => {
+                    playFaintSound();
+                    if (data.battleOver) {
+                        hpBattleState.phase = 'battle-over';
+                        guestAnimationQueue = [];
+                        if (localTargetSlot === 'cpu') {
+                            setTimeout(() => showHpBattleVictory(), 500);
+                        } else {
+                            setTimeout(() => showHpBattleLoss(), 500);
+                        }
+                    } else if (localTargetSlot === 'player') {
+                        // Guest's own Pokemon fainted — host will send hp-request-switch
+                        // Wait for that message (it will show switch overlay)
+                        processNextGuestAnimation();
+                    } else {
+                        // Opponent's Pokemon fainted — wait for auto-switch message from host
+                        processNextGuestAnimation();
+                    }
+                });
+            } else {
+                setTimeout(() => processNextGuestAnimation(), 600);
+            }
+        });
+    } else if (data.resultType === 'auto-switch') {
+        // Host tells us a Pokemon was auto-switched
+        // Map side: host's 'cpu' = guest's 'player', host's 'player' = guest's 'cpu'
+        const localSlot = data.side === 'cpu' ? 'player' : 'cpu';
+        const activeKey = localSlot === 'cpu' ? 'cpuActive' : 'playerActive';
+        hpBattleState[activeKey] = data.newActiveIndex;
+        renderBattleScene();
+        animateSwitchIn(localSlot, () => {
+            renderBattleScene();
+            setTimeout(() => processNextGuestAnimation(), 600);
+        });
+    }
+}
+
+function handleHpPlayAgain() {
+    document.getElementById('hp-battle-result-modal').classList.add('hidden');
+    confettiParticles = [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hpBattleState.opponentTeamIds = null;
+    guestAnimationQueue = [];
+    guestAnimating = false;
+    showTeamPicker();
+}
+
+// Guest receives: "your Pokemon fainted, pick replacement"
+function handleRequestSwitch() {
+    // Guest's own Pokemon fainted (host's 'cpu' = guest's 'player')
+    // Show switch overlay for guest to pick
+    hpBattleState._pendingSwitchSlot = 'player';
+    hpBattleState._pendingNextAttacker = null; // Guest doesn't run auto-battle
+    showSwitchOverlay(hpBattleState.playerTeam, hpBattleState.playerActive);
+    // onPlayerSwitch() will send hp-switch-choice to host
+}
+
+// Host receives: guest picked their replacement
+function handleSwitchChoice(data) {
+    const newIndex = data.newActiveIndex;
+    hpBattleState.cpuActive = newIndex;
+
+    // Don't send auto-switch back to guest — guest already animated their own switch locally
+
+    renderBattleScene();
+    animateSwitchIn('cpu', () => {
+        renderBattleScene();
+        // Resume auto-battle
+        setTimeout(() => runAutoBattle(hpBattleState._pendingNextAttacker), 600);
+    });
+}
 
 function getSpriteUrl(pokemonId) {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonId}.png`;
@@ -380,328 +901,633 @@ function shuffleArray(arr) {
     return a;
 }
 
-function initBattle() {
-    // Shuffle all pokemon and deal 10 to each player
-    const shuffled = shuffleArray(POKEMON_DATA);
-    battleState.player1Hand = shuffled.slice(0, 10);
-    battleState.player2Hand = shuffled.slice(10, 20);
-    battleState.player1Score = 0;
-    battleState.player2Score = 0;
-    battleState.round = 1;
-    battleState.player1Card = null;
-    battleState.player2Card = null;
-    battleState.phase = 'p1-picking';
+// ===========================
+// HP BATTLE MODE (new)
+// ===========================
 
-    // Reset UI
-    updateBattleHeader();
-    clearArena();
-    battleResultArea.classList.add('hidden');
-    battleResultModal.classList.add('hidden');
-    passScreen.classList.add('hidden');
-    confettiParticles = [];
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+const hpBattleState = {
+    playerTeam: [],      // [{...pokemon, currentHp}, ...]
+    cpuTeam: [],         // Also used for opponent team in online mode
+    playerActive: 0,     // index into playerTeam
+    cpuActive: 0,
+    phase: 'idle',       // auto-battling, battle-over
+    isOnline: false,
+    isHost: false,
+    opponentTeamIds: null, // Received opponent team IDs (waiting state)
+};
 
-    battlePromptEl.textContent = 'Player 1, pick a card!';
-    renderPlayerHand(battleState.player1Hand);
+// Team Picker
+let selectedTeam = [];
+
+function showTeamPicker() {
+    selectedTeam = [];
+    showScreen('team-picker');
+    renderTeamPickerGrid();
+    updateTeamCounter();
+    document.getElementById('start-battle-btn').disabled = true;
 }
 
-function updateBattleHeader() {
-    battleRoundEl.textContent = `Round ${battleState.round} / 3`;
-    p1ScoreEl.textContent = `P1: ${battleState.player1Score}`;
-    p2ScoreEl.textContent = `P2: ${battleState.player2Score}`;
-}
+function renderTeamPickerGrid() {
+    const grid = document.getElementById('team-picker-grid');
+    grid.innerHTML = '';
+    const progress = loadProgress();
 
-function clearArena() {
-    arenaCard1El.innerHTML = '';
-    arenaCard2El.innerHTML = '';
-    arenaCard1El.className = 'arena-card-placeholder';
-    arenaCard2El.className = 'arena-card-placeholder';
-    arenaSlot1El.className = 'arena-slot';
-    arenaSlot2El.className = 'arena-slot';
-    roundResultText.classList.remove('result-slam');
-    const vsBadge = document.querySelector('.vs-badge');
-    vsBadge.classList.remove('vs-clash', 'vs-impact');
-    const arena = document.querySelector('.battle-arena');
-    arena.classList.remove('arena-clash');
-}
-
-function renderPlayerHand(hand) {
-    playerHandEl.innerHTML = '';
-    hand.forEach((pokemon, index) => {
+    BATTLE_POKEMON.forEach((pokemon) => {
         const card = document.createElement('div');
-        card.classList.add('battle-card');
-        card.style.borderColor = TYPE_COLORS[pokemon.type];
-        card.style.animationDelay = `${index * 100}ms`;
+        const isUnlocked = progress.unlockedPokemon.includes(pokemon.id);
+        card.classList.add('team-card');
 
-        const img = document.createElement('img');
-        img.src = getSpriteUrl(pokemon.id);
-        img.alt = pokemon.name;
-        img.classList.add('battle-card-sprite');
+        if (!isUnlocked) {
+            card.classList.add('locked');
+            card.innerHTML = `
+                <div class="locked-icon">?</div>
+                <div class="team-card-name">???</div>
+            `;
+        } else {
+            const isSelected = selectedTeam.some(p => p.id === pokemon.id);
+            if (isSelected) card.classList.add('selected');
 
-        const name = document.createElement('div');
-        name.classList.add('battle-card-name');
-        name.textContent = pokemon.name;
+            card.style.borderColor = TYPE_COLORS[pokemon.type];
+            card.innerHTML = `
+                <img src="${getSpriteUrl(pokemon.id)}" class="team-card-sprite" alt="${pokemon.name}">
+                <div class="team-card-name">${pokemon.name}</div>
+                <div class="team-card-info">
+                    <span class="type-badge type-${pokemon.type}">${pokemon.type}</span>
+                    <span class="team-card-hp">❤️${pokemon.hp}</span>
+                </div>
+                ${isSelected ? '<div class="team-card-check">✓</div>' : ''}
+            `;
 
-        const info = document.createElement('div');
-        info.classList.add('battle-card-info');
+            card.addEventListener('click', () => {
+                togglePokemonSelection(pokemon);
+            });
+        }
 
-        const typeBadge = document.createElement('span');
-        typeBadge.classList.add('type-badge', `type-${pokemon.type}`);
-        typeBadge.textContent = pokemon.type;
-
-        const power = document.createElement('span');
-        power.classList.add('power-display');
-        power.textContent = `⚡${pokemon.power}`;
-
-        info.appendChild(typeBadge);
-        info.appendChild(power);
-
-        card.appendChild(img);
-        card.appendChild(name);
-        card.appendChild(info);
-
-        card.addEventListener('click', () => selectBattleCard(pokemon, card));
-        playerHandEl.appendChild(card);
+        grid.appendChild(card);
     });
 }
 
-function selectBattleCard(pokemon, cardElement) {
-    if (battleState.phase !== 'p1-picking' && battleState.phase !== 'p2-picking') return;
-
-    playFlipSound();
-    cardElement.classList.add('selected');
-
-    if (battleState.phase === 'p1-picking') {
-        battleState.player1Card = pokemon;
-        placeCardInArena(1);
-
-        // Remove from hand
-        battleState.player1Hand = battleState.player1Hand.filter(p => p !== pokemon);
-
-        // Show pass screen after brief delay
-        setTimeout(() => showPassScreen(), 400);
-
-    } else if (battleState.phase === 'p2-picking') {
-        battleState.player2Card = pokemon;
-        placeCardInArena(2);
-
-        // Remove from hand
-        battleState.player2Hand = battleState.player2Hand.filter(p => p !== pokemon);
-
-        // Reveal both cards after brief delay
-        setTimeout(() => revealBattle(), 600);
-    }
-}
-
-function placeCardInArena(playerNum) {
-    const placeholder = playerNum === 1 ? arenaCard1El : arenaCard2El;
-    placeholder.classList.add('has-card');
-}
-
-function showPassScreen() {
-    battleState.phase = 'passing';
-    passText.textContent = 'Pass to Player 2';
-    passScreen.classList.remove('hidden');
-    playerHandEl.innerHTML = '';
-}
-
-function onPassReady() {
-    passScreen.classList.add('hidden');
-    battleState.phase = 'p2-picking';
-    battlePromptEl.textContent = 'Player 2, pick a card!';
-    renderPlayerHand(battleState.player2Hand);
-}
-
-passReadyBtn.addEventListener('click', onPassReady);
-
-function revealBattle() {
-    battleState.phase = 'revealing';
-    playerHandEl.innerHTML = '';
-
-    const p1 = battleState.player1Card;
-    const p2 = battleState.player2Card;
-    const p1Bonus = calculateTypeBonus(p1.type, p2.type);
-    const p2Bonus = calculateTypeBonus(p2.type, p1.type);
-    const p1Effective = p1.power + p1Bonus;
-    const p2Effective = p2.power + p2Bonus;
-
-    const arena = document.querySelector('.battle-arena');
-    const vsBadge = document.querySelector('.vs-badge');
-
-    // Phase 1: VS pulse buildup (0ms)
-    battlePromptEl.textContent = '';
-    vsBadge.classList.add('vs-clash');
-    playBattleClash();
-
-    // Phase 2: Reveal Player 1 card (600ms)
-    setTimeout(() => {
-        renderArenaCard(arenaCard1El, p1, p1Bonus, p1Effective);
+function togglePokemonSelection(pokemon) {
+    const idx = selectedTeam.findIndex(p => p.id === pokemon.id);
+    if (idx >= 0) {
+        selectedTeam.splice(idx, 1);
+    } else if (selectedTeam.length < 3) {
+        selectedTeam.push(pokemon);
         playFlipSound();
-    }, 600);
-
-    // Phase 3: Reveal Player 2 card (1100ms)
-    setTimeout(() => {
-        renderArenaCard(arenaCard2El, p2, p2Bonus, p2Effective);
-        playFlipSound();
-    }, 1100);
-
-    // Phase 4: Clash impact — screen shake + flash (1600ms)
-    setTimeout(() => {
-        arena.classList.add('arena-clash');
-        vsBadge.classList.remove('vs-clash');
-        vsBadge.classList.add('vs-impact');
-        playTone(60, 'square', 0.4);
-        playTone(120, 'sawtooth', 0.3);
-        vibrate([80, 30, 80]);
-    }, 1600);
-
-    // Phase 5: Show winner (2200ms)
-    setTimeout(() => {
-        arena.classList.remove('arena-clash');
-        vsBadge.classList.remove('vs-impact');
-
-        let resultText;
-        if (p1Effective > p2Effective) {
-            battleState.player1Score++;
-            resultText = `Player 1 wins! (${p1Effective} vs ${p2Effective})`;
-            arenaSlot1El.classList.add('winner');
-            arenaSlot2El.classList.add('loser');
-            playWinnerSting();
-        } else if (p2Effective > p1Effective) {
-            battleState.player2Score++;
-            resultText = `Player 2 wins! (${p2Effective} vs ${p1Effective})`;
-            arenaSlot2El.classList.add('winner');
-            arenaSlot1El.classList.add('loser');
-            playWinnerSting();
-        } else {
-            resultText = `It's a tie! (${p1Effective} vs ${p2Effective})`;
-            playTieSting();
-        }
-
-        updateBattleHeader();
-        roundResultText.textContent = resultText;
-        roundResultText.classList.add('result-slam');
-
-        battleResultArea.classList.remove('hidden');
-        if (battleState.round >= 3) {
-            nextRoundBtn.textContent = 'See Results';
-        } else {
-            nextRoundBtn.textContent = 'Next Round';
-        }
-
-        battleState.phase = 'result';
-    }, 2200);
-}
-
-function calculateTypeBonus(attackerType, defenderType) {
-    const chart = TYPE_CHART[attackerType];
-    if (!chart) return 0;
-    if (chart.beats === defenderType) return TYPE_BONUS;
-    if (chart.losesTo === defenderType) return -TYPE_BONUS;
-    return 0;
-}
-
-function renderArenaCard(placeholder, pokemon, bonus, effectivePower) {
-    placeholder.className = 'arena-card-placeholder revealed';
-    placeholder.innerHTML = '';
-
-    const card = document.createElement('div');
-    card.classList.add('arena-battle-card');
-    card.style.borderColor = TYPE_COLORS[pokemon.type];
-
-    const img = document.createElement('img');
-    img.src = getSpriteUrl(pokemon.id);
-    img.alt = pokemon.name;
-    img.classList.add('battle-card-sprite');
-
-    const name = document.createElement('div');
-    name.classList.add('battle-card-name');
-    name.textContent = pokemon.name;
-
-    const stats = document.createElement('div');
-    stats.classList.add('battle-card-stats');
-
-    const typeBadge = document.createElement('span');
-    typeBadge.classList.add('type-badge', `type-${pokemon.type}`);
-    typeBadge.textContent = pokemon.type;
-
-    const power = document.createElement('span');
-    power.classList.add('power-display');
-    power.textContent = `⚡${effectivePower}`;
-
-    stats.appendChild(typeBadge);
-    stats.appendChild(power);
-
-    card.appendChild(img);
-    card.appendChild(name);
-    card.appendChild(stats);
-
-    if (bonus !== 0) {
-        const bonusEl = document.createElement('div');
-        bonusEl.classList.add('bonus-text', bonus > 0 ? 'advantage' : 'disadvantage');
-        bonusEl.textContent = bonus > 0 ? `+${bonus} type bonus!` : `${bonus} type penalty`;
-        card.appendChild(bonusEl);
-    }
-
-    placeholder.appendChild(card);
-}
-
-// Next round / see results button
-nextRoundBtn.addEventListener('click', () => {
-    if (battleState.round >= 3) {
-        showBattleFinalResult();
     } else {
-        battleState.round++;
-        battleState.player1Card = null;
-        battleState.player2Card = null;
-        battleState.phase = 'p1-picking';
-
-        clearArena();
-        battleResultArea.classList.add('hidden');
-        updateBattleHeader();
-        battlePromptEl.textContent = 'Player 1, pick a card!';
-        renderPlayerHand(battleState.player1Hand);
+        return; // Already 3 selected
     }
+    renderTeamPickerGrid();
+    updateTeamCounter();
+    document.getElementById('start-battle-btn').disabled = selectedTeam.length !== 3;
+}
+
+function updateTeamCounter() {
+    document.getElementById('team-counter').textContent = `${selectedTeam.length} / 3`;
+}
+
+document.getElementById('team-picker-back-btn').addEventListener('click', () => {
+    if (hpBattleState.isOnline) {
+        cleanupPeer();
+        hpBattleState.isOnline = false;
+        isOnline = false;
+    }
+    showScreen('battle-mode-selector');
 });
 
-function showBattleFinalResult() {
-    battleResultArea.classList.add('hidden');
+document.getElementById('start-battle-btn').addEventListener('click', () => {
+    if (selectedTeam.length !== 3) return;
+    startBattleWithTeam();
+});
 
-    const p1 = battleState.player1Score;
-    const p2 = battleState.player2Score;
+function cpuPickTeam(playerTeam) {
+    const progress = loadProgress();
+    const available = BATTLE_POKEMON.filter(p =>
+        progress.unlockedPokemon.includes(p.id) &&
+        !playerTeam.some(pt => pt.id === p.id)
+    );
+    // If not enough unlocked Pokemon, use all battle Pokemon
+    const pool = available.length >= 3 ? available : BATTLE_POKEMON.filter(p =>
+        !playerTeam.some(pt => pt.id === p.id)
+    );
+    return shuffleArray(pool).slice(0, 3);
+}
 
-    if (p1 > p2) {
-        battleWinnerText.textContent = 'Player 1 Wins!';
-    } else if (p2 > p1) {
-        battleWinnerText.textContent = 'Player 2 Wins!';
+function startBattleWithTeam() {
+    if (hpBattleState.isOnline) {
+        // Send team to opponent
+        sendData({
+            type: 'hp-team-ready',
+            team: selectedTeam.map(p => p.id),
+        });
+        // Show waiting overlay
+        const overlay = document.getElementById('online-waiting-overlay');
+        document.getElementById('online-waiting-text').textContent = 'Waiting for opponent...';
+        overlay.classList.remove('hidden');
+        document.getElementById('start-battle-btn').disabled = true;
+
+        // Check if opponent already sent their team
+        if (hpBattleState.opponentTeamIds) {
+            startOnlineBattle();
+        }
     } else {
-        battleWinnerText.textContent = "It's a Tie!";
+        const playerTeam = selectedTeam.map(p => ({ ...p, currentHp: p.hp }));
+        const cpuTeamRaw = cpuPickTeam(selectedTeam);
+        const cpuTeam = cpuTeamRaw.map(p => ({ ...p, currentHp: p.hp }));
+        initHpBattle(playerTeam, cpuTeam);
     }
-    battleFinalScore.textContent = `${p1} - ${p2}`;
+}
 
-    battleResultModal.classList.remove('hidden');
+function initHpBattle(playerTeam, cpuTeam) {
+    hpBattleState.playerTeam = playerTeam;
+    hpBattleState.cpuTeam = cpuTeam;
+    hpBattleState.playerActive = 0;
+    hpBattleState.cpuActive = 0;
+    hpBattleState.phase = 'auto-battling';
+
+    showScreen('hp-battle-screen');
+
+    // Clear any previous state
+    confettiParticles = [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById('hp-battle-result-modal').classList.add('hidden');
+    document.getElementById('online-waiting-overlay').classList.add('hidden');
+    document.getElementById('switch-overlay').classList.add('hidden');
+
+    renderBattleScene();
+
+    // Start auto-battle after a brief delay so player can see both teams
+    if (!hpBattleState.isOnline || hpBattleState.isHost) {
+        setTimeout(() => runAutoBattle('player'), 1000);
+    }
+}
+
+function runAutoBattle(attackerSide) {
+    if (hpBattleState.phase === 'battle-over') return;
+    hpBattleState.phase = 'auto-battling';
+
+    let attacker, defender, targetSlot;
+    if (attackerSide === 'player') {
+        attacker = hpBattleState.playerTeam[hpBattleState.playerActive];
+        defender = hpBattleState.cpuTeam[hpBattleState.cpuActive];
+        targetSlot = 'cpu';
+    } else {
+        attacker = hpBattleState.cpuTeam[hpBattleState.cpuActive];
+        defender = hpBattleState.playerTeam[hpBattleState.playerActive];
+        targetSlot = 'player';
+    }
+
+    const multiplier = getTypeMultiplier(attacker.type, defender.type);
+    const damage = Math.max(1, Math.round(attacker.baseDamage * multiplier));
+
+    // Send attack result to online guest
+    if (hpBattleState.isOnline && hpBattleState.isHost) {
+        const defenderNewHp = Math.max(0, defender.currentHp - damage);
+        const fainted = defenderNewHp <= 0;
+        let battleOver = false;
+        if (fainted) {
+            const faintedTeam = targetSlot === 'cpu' ? hpBattleState.cpuTeam : hpBattleState.playerTeam;
+            const faintedActive = targetSlot === 'cpu' ? hpBattleState.cpuActive : hpBattleState.playerActive;
+            const hasMore = faintedTeam.some((p, i) => i !== faintedActive && p.currentHp > 0);
+            if (!hasMore) battleOver = true;
+        }
+        sendData({
+            type: 'hp-turn-result',
+            resultType: 'attack',
+            attackerSide: attackerSide,
+            targetSlot: targetSlot,
+            damage: damage,
+            multiplier: multiplier,
+            attackerType: attacker.type,
+            newHp: Math.max(0, defender.currentHp - damage),
+            fainted: fainted,
+            battleOver: battleOver,
+        });
+    }
+
+    // Animate the attack
+    animateAttack(targetSlot, damage, multiplier, attacker.type, () => {
+        defender.currentHp = Math.max(0, defender.currentHp - damage);
+        renderBattleScene();
+
+        if (defender.currentHp <= 0) {
+            animateFaint(targetSlot, () => {
+                playFaintSound();
+                const faintedTeam = targetSlot === 'cpu' ? hpBattleState.cpuTeam : hpBattleState.playerTeam;
+                const faintedActiveKey = targetSlot === 'cpu' ? 'cpuActive' : 'playerActive';
+                const hasMore = faintedTeam.some((p, i) => i !== hpBattleState[faintedActiveKey] && p.currentHp > 0);
+
+                if (!hasMore) {
+                    // Battle over
+                    hpBattleState.phase = 'battle-over';
+                    if (targetSlot === 'cpu') {
+                        setTimeout(() => showHpBattleVictory(), 500);
+                    } else {
+                        setTimeout(() => showHpBattleLoss(), 500);
+                    }
+                } else {
+                    // A Pokemon fainted but the team has more alive
+                    const nextAttacker = attackerSide === 'player' ? 'cpu' : 'player';
+
+                    if (targetSlot === 'player') {
+                        // Player's Pokemon fainted — player picks replacement
+                        hpBattleState._pendingNextAttacker = nextAttacker;
+                        hpBattleState._pendingSwitchSlot = 'player';
+                        showSwitchOverlay(hpBattleState.playerTeam, hpBattleState.playerActive);
+                        // onPlayerSwitch() will resume the loop
+                    } else {
+                        // Opponent's Pokemon fainted (targetSlot === 'cpu')
+                        if (!hpBattleState.isOnline) {
+                            // CPU mode: auto-switch (CPU picks first alive)
+                            const nextAlive = faintedTeam.findIndex((p, i) => i !== hpBattleState[faintedActiveKey] && p.currentHp > 0);
+                            hpBattleState[faintedActiveKey] = nextAlive;
+
+                            renderBattleScene();
+                            animateSwitchIn(targetSlot, () => {
+                                renderBattleScene();
+                                setTimeout(() => runAutoBattle(nextAttacker), 600);
+                            });
+                        } else {
+                            // Online mode (host): ask guest to pick replacement
+                            hpBattleState._pendingNextAttacker = nextAttacker;
+                            sendData({
+                                type: 'hp-request-switch',
+                            });
+                            // Pause auto-battle. Wait for guest's hp-switch-choice reply.
+                        }
+                    }
+                }
+            });
+        } else {
+            // No faint — switch attacker and continue
+            const nextAttacker = attackerSide === 'player' ? 'cpu' : 'player';
+            setTimeout(() => runAutoBattle(nextAttacker), 600);
+        }
+    });
+}
+
+// ===========================
+// SWITCH OVERLAY (faint replacement picker)
+// ===========================
+
+function showSwitchOverlay(team, activeIndex) {
+    const list = document.getElementById('switch-pokemon-list');
+    list.innerHTML = '';
+
+    team.forEach((pokemon, index) => {
+        if (index === activeIndex || pokemon.currentHp <= 0) return;
+
+        const card = document.createElement('div');
+        card.className = 'switch-card';
+        card.style.borderColor = TYPE_COLORS[pokemon.type];
+        card.innerHTML = `
+            <img src="${getSpriteUrl(pokemon.id)}" class="switch-card-sprite" alt="${pokemon.name}">
+            <div class="switch-card-info">
+                <div class="switch-card-name">${pokemon.name}</div>
+                <span class="type-badge type-${pokemon.type}">${pokemon.type}</span>
+                <div class="switch-card-hp">❤️ ${pokemon.currentHp} / ${pokemon.hp}</div>
+            </div>
+        `;
+        card.addEventListener('click', () => {
+            onPlayerSwitch(index);
+        });
+        list.appendChild(card);
+    });
+
+    document.getElementById('switch-overlay').classList.remove('hidden');
+}
+
+function onPlayerSwitch(newIndex) {
+    document.getElementById('switch-overlay').classList.add('hidden');
+
+    const pendingNextAttacker = hpBattleState._pendingNextAttacker;
+    const switchSlot = hpBattleState._pendingSwitchSlot;
+
+    if (switchSlot === 'player') {
+        hpBattleState.playerActive = newIndex;
+    } else {
+        hpBattleState.cpuActive = newIndex;
+    }
+
+    // Online: notify the other side about the switch
+    if (hpBattleState.isOnline) {
+        if (hpBattleState.isHost) {
+            // Host picked for 'player' side — send auto-switch to guest
+            sendData({
+                type: 'hp-turn-result',
+                resultType: 'auto-switch',
+                side: 'player',
+                newActiveIndex: newIndex,
+            });
+        } else {
+            // Guest picked — send choice to host
+            sendData({
+                type: 'hp-switch-choice',
+                newActiveIndex: newIndex,
+            });
+        }
+    }
+
+    renderBattleScene();
+    animateSwitchIn(switchSlot, () => {
+        renderBattleScene();
+        // Resume auto-battle (host or CPU mode)
+        if (!hpBattleState.isOnline || hpBattleState.isHost) {
+            setTimeout(() => runAutoBattle(pendingNextAttacker), 600);
+        }
+        // Guest: after animating own switch, just resume the queue
+        if (hpBattleState.isOnline && !hpBattleState.isHost) {
+            setTimeout(() => processNextGuestAnimation(), 600);
+        }
+    });
+}
+
+function renderBattleScene() {
+    const player = hpBattleState.playerTeam[hpBattleState.playerActive];
+    const cpu = hpBattleState.cpuTeam[hpBattleState.cpuActive];
+
+    // CPU display
+    document.getElementById('cpu-pokemon-name').textContent = cpu.name;
+    const cpuTypeBadge = document.getElementById('cpu-pokemon-type');
+    cpuTypeBadge.textContent = cpu.type;
+    cpuTypeBadge.className = `type-badge type-${cpu.type}`;
+    document.getElementById('cpu-pokemon-sprite').src = getSpriteUrl(cpu.id);
+    document.getElementById('cpu-pokemon-sprite').alt = cpu.name;
+    renderHpBar('cpu-hp-bar', 'cpu-hp-text', cpu.currentHp, cpu.hp);
+
+    // Player display
+    document.getElementById('player-pokemon-name').textContent = player.name;
+    const playerTypeBadge = document.getElementById('player-pokemon-type');
+    playerTypeBadge.textContent = player.type;
+    playerTypeBadge.className = `type-badge type-${player.type}`;
+    document.getElementById('player-pokemon-sprite').src = getSpriteUrl(player.id);
+    document.getElementById('player-pokemon-sprite').alt = player.name;
+    renderHpBar('player-hp-bar', 'player-hp-text', player.currentHp, player.hp);
+
+    // Team dots
+    renderTeamDots('cpu-team-dots', hpBattleState.cpuTeam);
+    renderTeamDots('player-team-dots', hpBattleState.playerTeam);
+}
+
+function renderHpBar(barId, textId, current, max) {
+    const bar = document.getElementById(barId);
+    const text = document.getElementById(textId);
+    const pct = Math.max(0, (current / max) * 100);
+    bar.style.width = pct + '%';
+
+    // Color based on percentage
+    if (pct > 50) {
+        bar.style.background = '#4CAF50';
+    } else if (pct > 25) {
+        bar.style.background = '#FFC107';
+    } else {
+        bar.style.background = '#f44336';
+    }
+
+    text.textContent = `${Math.max(0, current)} / ${max}`;
+}
+
+function renderTeamDots(containerId, team) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    team.forEach((p) => {
+        const dot = document.createElement('span');
+        dot.classList.add('team-dot');
+        if (p.currentHp <= 0) {
+            dot.classList.add('fainted');
+        }
+        container.appendChild(dot);
+    });
+}
+
+function animateAttack(targetSlot, damage, multiplier, attackerType, callback) {
+    const spriteId = targetSlot === 'cpu' ? 'cpu-pokemon-sprite' : 'player-pokemon-sprite';
+    const calloutId = targetSlot === 'cpu' ? 'cpu-damage-callout' : 'player-damage-callout';
+    const displayId = targetSlot === 'cpu' ? 'cpu-pokemon-display' : 'player-pokemon-display';
+    const sprite = document.getElementById(spriteId);
+    const callout = document.getElementById(calloutId);
+    const display = document.getElementById(displayId);
+
+    // Attacker animation (opposite side slides forward)
+    const attackerSpriteId = targetSlot === 'cpu' ? 'player-pokemon-sprite' : 'cpu-pokemon-sprite';
+    const attackerSprite = document.getElementById(attackerSpriteId);
+
+    playAttackSound(attackerType);
+
+    // Attacker slides forward
+    attackerSprite.classList.add('sprite-attack');
+
+    setTimeout(() => {
+        attackerSprite.classList.remove('sprite-attack');
+
+        // Hit flash on target
+        sprite.classList.add('sprite-hit');
+        if (multiplier >= 2) {
+            display.classList.add('screen-shake');
+            playSuperEffectiveSound();
+        }
+
+        // Show damage callout
+        callout.classList.remove('hidden');
+        if (multiplier >= 2) {
+            callout.textContent = `SUPER! -${damage}`;
+            callout.className = 'damage-callout super-effective';
+        } else if (multiplier <= 0.5) {
+            callout.textContent = `Weak... -${damage}`;
+            callout.className = 'damage-callout not-effective';
+        } else {
+            callout.textContent = `-${damage}`;
+            callout.className = 'damage-callout neutral-hit';
+        }
+
+        // HP bar drain
+        setTimeout(() => {
+            sprite.classList.remove('sprite-hit');
+            display.classList.remove('screen-shake');
+
+            setTimeout(() => {
+                callout.classList.add('hidden');
+                callout.className = 'damage-callout hidden';
+                if (callback) callback();
+            }, 400);
+        }, 600);
+    }, 300);
+}
+
+function animateFaint(slot, callback) {
+    const spriteId = slot === 'cpu' ? 'cpu-pokemon-sprite' : 'player-pokemon-sprite';
+    const sprite = document.getElementById(spriteId);
+    sprite.classList.add('sprite-faint');
+
+    setTimeout(() => {
+        sprite.classList.remove('sprite-faint');
+        if (callback) callback();
+    }, 500);
+}
+
+function animateSwitchIn(slot, callback) {
+    const spriteId = slot === 'cpu' ? 'cpu-pokemon-sprite' : 'player-pokemon-sprite';
+    const sprite = document.getElementById(spriteId);
+
+    // Update sprite first
+    const team = slot === 'cpu' ? hpBattleState.cpuTeam : hpBattleState.playerTeam;
+    const activeIdx = slot === 'cpu' ? hpBattleState.cpuActive : hpBattleState.playerActive;
+    const pokemon = team[activeIdx];
+    sprite.src = getSpriteUrl(pokemon.id);
+
+    sprite.classList.add('sprite-switch-in');
+    playFlipSound();
+
+    setTimeout(() => {
+        sprite.classList.remove('sprite-switch-in');
+        renderBattleScene();
+        if (callback) callback();
+    }, 400);
+}
+
+function showHpBattleVictory() {
+    const streak = incrementWinStreak();
+    const cpuDefeated = hpBattleState.cpuTeam[hpBattleState.cpuActive];
+    addSticker(cpuDefeated.id);
+
+    // Add stickers for all opponent team Pokemon
+    hpBattleState.cpuTeam.forEach(p => addSticker(p.id));
+
+    const modal = document.getElementById('hp-battle-result-modal');
+    document.getElementById('hp-battle-winner-text').textContent = 'You Win!';
+
+    // Show sticker (only for CPU mode)
+    const stickerArea = document.getElementById('hp-battle-sticker');
+    if (hpBattleState.isOnline) {
+        stickerArea.classList.add('hidden');
+    } else {
+        const stickerSprite = document.getElementById('hp-sticker-sprite');
+        stickerSprite.src = getSpriteUrl(cpuDefeated.id);
+        stickerArea.classList.remove('hidden');
+    }
+
+    // Show streak
+    const streakEl = document.getElementById('hp-battle-streak');
+    if (streak >= 3) {
+        streakEl.textContent = '⭐'.repeat(Math.min(streak, 10)) + ' Win Streak!';
+    } else {
+        streakEl.textContent = '⭐'.repeat(streak);
+    }
+
+    modal.classList.remove('hidden');
     playVictoryFanfare();
+    speakVictoryMessage();
     createConfetti();
     vibrate([50, 30, 50, 30, 50, 30, 100]);
 }
 
-// Battle result modal buttons
-document.getElementById('battle-play-again-btn').addEventListener('click', () => {
-    battleResultModal.classList.add('hidden');
+function showHpBattleLoss() {
+    if (!hpBattleState.isOnline) {
+        resetWinStreak();
+    }
+
+    const modal = document.getElementById('hp-battle-result-modal');
+    document.getElementById('hp-battle-winner-text').textContent = hpBattleState.isOnline ? 'You Lose!' : 'Good Try!';
+    document.getElementById('hp-battle-sticker').classList.add('hidden');
+    document.getElementById('hp-battle-streak').textContent = hpBattleState.isOnline ? 'Better luck next time!' : 'You can do it next time!';
+
+    modal.classList.remove('hidden');
+    playTieSting();
+    vibrate([50, 30, 50]);
+}
+
+// HP Battle modal buttons
+document.getElementById('hp-battle-again-btn').addEventListener('click', () => {
+    document.getElementById('hp-battle-result-modal').classList.add('hidden');
     confettiParticles = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    initBattle();
+    if (hpBattleState.isOnline) {
+        sendData({ type: 'hp-play-again' });
+        hpBattleState.opponentTeamIds = null;
+        showTeamPicker();
+    } else {
+        showTeamPicker();
+    }
 });
 
-document.getElementById('battle-main-menu-btn').addEventListener('click', () => {
-    battleResultModal.classList.add('hidden');
+document.getElementById('hp-battle-menu-btn-modal').addEventListener('click', () => {
+    document.getElementById('hp-battle-result-modal').classList.add('hidden');
     confettiParticles = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (hpBattleState.isOnline) {
+        cleanupPeer();
+        hpBattleState.isOnline = false;
+        isOnline = false;
+    }
     showScreen('mode-selector');
 });
 
-// Battle menu button (back to main menu)
-document.getElementById('battle-menu-btn').addEventListener('click', () => {
+document.getElementById('hp-battle-menu-btn').addEventListener('click', () => {
+    if (hpBattleState.isOnline) {
+        cleanupPeer();
+        hpBattleState.isOnline = false;
+        isOnline = false;
+    }
+    showScreen('mode-selector');
+});
+
+// ===========================
+// COLLECTION SCREEN
+// ===========================
+
+function showCollectionScreen() {
+    showScreen('collection-screen');
+    renderCollectionGrid();
+    renderWinStreak();
+}
+
+function renderCollectionGrid() {
+    const grid = document.getElementById('collection-grid');
+    grid.innerHTML = '';
+    const progress = loadProgress();
+
+    BATTLE_POKEMON.forEach((pokemon) => {
+        const card = document.createElement('div');
+        const isUnlocked = progress.unlockedPokemon.includes(pokemon.id);
+        const hasSticker = progress.stickers.includes(pokemon.id);
+
+        card.classList.add('collection-card');
+
+        if (!isUnlocked) {
+            card.classList.add('collection-locked');
+            card.innerHTML = `
+                <div class="collection-silhouette">?</div>
+                <div class="collection-card-name">???</div>
+            `;
+        } else {
+            if (hasSticker) card.classList.add('collection-sticker');
+            card.style.borderColor = TYPE_COLORS[pokemon.type];
+            card.innerHTML = `
+                <img src="${getSpriteUrl(pokemon.id)}" class="collection-card-sprite" alt="${pokemon.name}">
+                <div class="collection-card-name">${pokemon.name}</div>
+                <div class="collection-card-info">
+                    <span class="type-badge type-${pokemon.type}">${pokemon.type}</span>
+                    <span class="collection-card-hp">❤️${pokemon.hp}</span>
+                </div>
+                ${hasSticker ? '<div class="sticker-badge">⭐</div>' : ''}
+            `;
+        }
+
+        grid.appendChild(card);
+    });
+}
+
+function renderWinStreak() {
+    const progress = loadProgress();
+    const display = document.getElementById('win-streak-display');
+    if (progress.winStreak > 0) {
+        display.textContent = '⭐'.repeat(Math.min(progress.winStreak, 10));
+    } else {
+        display.textContent = '';
+    }
+}
+
+document.getElementById('collection-back-btn').addEventListener('click', () => {
     showScreen('mode-selector');
 });
 
