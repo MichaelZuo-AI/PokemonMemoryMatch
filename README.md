@@ -8,7 +8,6 @@ Designed for **Xiaomi Pad 7S Pro** (3:2 Aspect Ratio).
 ## Features for Damian
 *   **Simple English**: Easy-to-read words like "Score", "Restart", and "Good Job".
 *   **Pokemon Theme**: Features Pikachu, Charmander, Mewtwo, and more!
-*   **Mewtwo "Psychic Flash"**: Investigating a pair of Mewtwo cards gives a special hint by briefly revealing all other cards!
 *   **Touch Friendly**: Large cards and buttons optimized for tablet use.
 *   **Victory Celebration**: 
     *   Confetti explosion! 🎉
@@ -17,7 +16,11 @@ Designed for **Xiaomi Pad 7S Pro** (3:2 Aspect Ratio).
 
 ## Release History
 
-### v1.1 - The "Good Job Damian" Update (current)
+### v1.2 - Gameplay Refinement
+*   **Removed Mewtwo Rule**: Game now follows standard memory match rules (find all pairs).
+*   **Bug Fix**: Fixed issue where overlay could hinder gameplay.
+
+### v1.1 - The "Good Job Damian" Update
 *   **New Feature**: Custom Audio - Plays "Good Job Damian" voice message on win.
 *   **Polish**: Added colorful Confetti explosion effect on victory.
 *   **UI**: Added a "Victory Modal" with 3 stars instead of a boring system alert.
